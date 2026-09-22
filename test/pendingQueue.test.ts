@@ -1,10 +1,13 @@
 import { strict as assert } from 'node:assert';
 import { test } from 'node:test';
 import {
+  appScopeKey,
   cellKey,
   groupByProfile,
   nextCellState,
+  toAppScopeMap,
   toPayloadMap,
+  toggleAppScope,
   togglePending,
 } from '../src/core/pendingQueue';
 
@@ -20,6 +23,7 @@ test('点击加入队列，再点撤销', () => {
   const once = togglePending(empty, 'a.one', '-aaa', 'enabled');
   assert.equal(once.size, 1);
   assert.deepEqual(once.get(cellKey('-aaa', 'a.one')), {
+    kind: 'cell',
     extensionId: 'a.one',
     profileLocation: '-aaa',
     from: 'enabled',
@@ -54,6 +58,7 @@ test('不同配置文件互不干扰', () => {
 test('不改动传入的 Map', () => {
   const original = new Map();
   togglePending(original, 'a.one', '-aaa', 'enabled');
+  toggleAppScope(original, 'a.one', true);
   assert.equal(original.size, 0);
 });
 
@@ -71,4 +76,42 @@ test('按配置文件分组', () => {
   assert.equal(grouped.size, 2);
   assert.equal(grouped.get('-aaa')?.length, 2);
   assert.equal(grouped.get('-bbb')?.length, 1);
+});
+
+// ---------- 全局共享标记 ----------
+
+test('切换全局共享标记', () => {
+  const once = toggleAppScope(new Map(), 'ms-vscode.cpptools', true);
+  assert.equal(once.size, 1);
+  assert.deepEqual(once.get(appScopeKey('ms-vscode.cpptools')), {
+    kind: 'appScope',
+    extensionId: 'ms-vscode.cpptools',
+    from: true,
+    to: false,
+  });
+
+  const twice = toggleAppScope(once, 'ms-vscode.cpptools', false);
+  assert.equal(twice.size, 0);
+});
+
+test('全局共享的 key 不会和配置目录名撞上', () => {
+  const pending = toggleAppScope(new Map(), 'a.one', false);
+  assert.notEqual(appScopeKey('a.one'), cellKey('-aaa', 'a.one'));
+  assert.equal(pending.has(cellKey('-aaa', 'a.one')), false);
+});
+
+test('两类改动共存时各归各的', () => {
+  let pending = togglePending(new Map(), 'a.one', '-aaa', 'enabled');
+  pending = toggleAppScope(pending, 'a.two', true);
+  assert.equal(pending.size, 2);
+  assert.deepEqual(toPayloadMap(pending), { '-aaa|a.one': 'disabled' });
+  assert.deepEqual(toAppScopeMap(pending), { 'a.two': false });
+});
+
+test('groupByProfile 只取配置级改动', () => {
+  let pending = togglePending(new Map(), 'a.one', '-aaa', 'enabled');
+  pending = toggleAppScope(pending, 'a.two', true);
+  const grouped = groupByProfile(pending);
+  assert.equal(grouped.size, 1);
+  assert.equal(grouped.get('-aaa')?.length, 1);
 });

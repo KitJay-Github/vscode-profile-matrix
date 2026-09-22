@@ -277,9 +277,33 @@ function renderNameCell(row) {
   const title = document.createElement('div');
   title.className = 'pm-name-title';
   title.textContent = row.name;
-  title.title = '在应用商店中查看';
+
+  const appPending = state.payload?.appScopedPending?.[row.id];
+  const effectiveAppScoped = appPending !== undefined ? appPending : row.appScoped;
+  if (appPending !== undefined) {
+    title.classList.add('pm-name-pending');
+  }
+  title.title =
+    appPending !== undefined
+      ? `待应用：将改为${appPending ? '全局共享' : '按配置单独管理'}`
+      : '点击去应用商店 · 右键切换「全局共享 / 按配置单独管理」';
+
   title.addEventListener('click', () => {
     vscode.postMessage({ type: 'openInMarketplace', extensionId: row.id });
+  });
+  title.addEventListener('contextmenu', (event) => {
+    event.preventDefault();
+    showMenu(event.clientX, event.clientY, [
+      {
+        label:
+          appPending !== undefined
+            ? '撤销这项改动'
+            : effectiveAppScoped
+              ? '改为按配置单独管理'
+              : '改为全局共享（所有配置一致）',
+        run: () => vscode.postMessage({ type: 'toggleAppScope', extensionId: row.id }),
+      },
+    ]);
   });
   const sub = document.createElement('div');
   sub.className = 'pm-sub';

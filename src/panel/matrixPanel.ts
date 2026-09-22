@@ -1,6 +1,12 @@
 import * as vscode from 'vscode';
 import { resolveUserDataPaths } from '../core/paths';
-import { toPayloadMap, togglePending, type PendingMap } from '../core/pendingQueue';
+import {
+  toAppScopeMap,
+  toPayloadMap,
+  toggleAppScope,
+  togglePending,
+  type PendingMap,
+} from '../core/pendingQueue';
 import { loadSnapshot } from '../core/snapshot';
 import type { CellState } from '../core/types';
 import { applyChanges } from '../core/writer';
@@ -60,8 +66,10 @@ export class MatrixPanel {
 
   private pushMatrix(): void {
     try {
-      const payload = loadSnapshot();
+      const appScopedOverrides = new Map(Object.entries(toAppScopeMap(this.pending)));
+      const payload = loadSnapshot(undefined, appScopedOverrides);
       payload.pending = toPayloadMap(this.pending);
+      payload.appScopedPending = toAppScopeMap(this.pending);
       for (const row of payload.rows) {
         if (row.iconPath) {
           row.iconUri = this.panel.webview
@@ -94,7 +102,7 @@ export class MatrixPanel {
       if (next.get(key)?.to === to) {
         next.delete(key);
       } else {
-        next.set(key, { extensionId, profileLocation, from: current, to });
+        next.set(key, { kind: 'cell', extensionId, profileLocation, from: current, to });
       }
       this.pending = next;
     } else {
@@ -151,6 +159,14 @@ export class MatrixPanel {
       case 'removeFromProfile':
         this.toggleCell(msg.extensionId, msg.profileLocation, 'absent');
         return;
+      case 'toggleAppScope': {
+        const row = this.lastPayload?.rows.find((r) => r.id === msg.extensionId);
+        if (row) {
+          this.pending = toggleAppScope(this.pending, msg.extensionId, row.appScoped);
+          this.pushMatrix();
+        }
+        return;
+      }
       case 'discardChanges':
         this.pending = new Map();
         this.pushMatrix();

@@ -10,8 +10,10 @@ export interface WebviewRow extends MatrixRow {
 export interface MatrixPayload {
   profiles: ProfileInfo[];
   rows: WebviewRow[];
-  /** 待应用的改动：`${profileLocation}|${extensionId}` -> 目标状态 */
+  /** 待应用的配置级改动：`${profileLocation}|${extensionId}` -> 目标状态 */
   pending: Record<string, CellState>;
+  /** 待应用的全局共享改动：extensionId -> 目标值 */
+  appScopedPending: Record<string, boolean>;
   /** 当前所在配置；无法判定时为 undefined */
   currentProfileLocation?: string;
   /** 内置 SQLite 是否可用；不可用时界面降级为不含禁用态的只读矩阵 */
@@ -30,6 +32,7 @@ export type WebviewToHostMessage =
   | { type: 'refresh' }
   | { type: 'toggleCell'; extensionId: string; profileLocation: string }
   | { type: 'removeFromProfile'; extensionId: string; profileLocation: string }
+  | { type: 'toggleAppScope'; extensionId: string }
   | { type: 'applyChanges' }
   | { type: 'discardChanges' }
   | { type: 'switchProfile'; location: string }

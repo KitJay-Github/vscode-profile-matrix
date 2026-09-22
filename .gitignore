@@ -4,4 +4,6 @@ out-test/
 *.vsix
 .spike/write-test/
 .spike/iso-data/
+.spike/appscope-test/ext/
+.spike/appscope-test/data/
 .superpowers/

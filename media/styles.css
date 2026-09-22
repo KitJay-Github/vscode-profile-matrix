@@ -136,6 +136,11 @@ tbody tr:hover td {
   text-decoration: underline;
 }
 
+/* 待应用的「全局共享」改动 */
+.pm-name-pending {
+  border-bottom: 1px dashed var(--pm-off);
+}
+
 .pm-sub {
   color: var(--pm-muted);
   font-size: 10px;

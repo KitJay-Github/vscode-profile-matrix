@@ -11,6 +11,8 @@ export interface MatrixInput {
   allExtensions: ExtensionEntry[];
   /** 扩展 id -> 展示名与图标 */
   meta?: Map<string, ExtensionMeta>;
+  /** 覆盖某些扩展的全局共享属性，用来预览还没落盘的改动 */
+  appScopedOverrides?: Map<string, boolean>;
 }
 
 const GROUP_ORDER: Record<RowGroup, number> = { managed: 0, global: 1, orphan: 2 };
@@ -24,7 +26,14 @@ const GROUP_ORDER: Record<RowGroup, number> = { managed: 0, global: 1, orphan: 2
  *   3. 是否在该配置的禁用列表里 → 在就是 disabled，否则 enabled
  */
 export function buildMatrix(input: MatrixInput): MatrixRow[] {
-  const { profiles, installedByProfile, disabledByProfile, allExtensions, meta } = input;
+  const {
+    profiles,
+    installedByProfile,
+    disabledByProfile,
+    allExtensions,
+    meta,
+    appScopedOverrides,
+  } = input;
 
   const known = new Map<string, ExtensionEntry>();
   const globalIds = new Set<string>();
@@ -39,6 +48,17 @@ export function buildMatrix(input: MatrixInput): MatrixRow[] {
   allExtensions.forEach(collect);
   for (const entries of installedByProfile.values()) {
     entries.forEach(collect);
+  }
+
+  // 覆盖在收集完之后统一应用，免得同 id 的多个条目把结果搅乱
+  if (appScopedOverrides) {
+    for (const [id, value] of appScopedOverrides) {
+      if (value) {
+        globalIds.add(id);
+      } else {
+        globalIds.delete(id);
+      }
+    }
   }
 
   const rows: MatrixRow[] = [];
@@ -75,6 +95,7 @@ export function buildMatrix(input: MatrixInput): MatrixRow[] {
       publisher,
       group,
       cells,
+      appScoped: isGlobal,
       iconPath: info?.iconPath,
     });
   }

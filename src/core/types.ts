@@ -41,6 +41,8 @@ export interface MatrixRow {
   group: RowGroup;
   /** profileLocation -> 状态 */
   cells: Record<string, CellState>;
+  /** 是否为全局共享（isApplicationScoped）：是的话不归任何配置管 */
+  appScoped: boolean;
   /** 扩展图标文件的绝对路径；没有图标时为 undefined */
   iconPath?: string;
 }

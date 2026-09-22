@@ -2,7 +2,12 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { readExtensionList } from './extensionStore';
 import type { UserDataPaths } from './paths';
-import { groupByProfile, type PendingMap } from './pendingQueue';
+import {
+  groupByProfile,
+  isAppScopeChange,
+  type AppScopeChange,
+  type PendingMap,
+} from './pendingQueue';
 import { disabledDbPath, extensionListPath } from './profileFiles';
 import { readProfiles } from './profileStore';
 import { DISABLED_KEY, loadSqlite, readDisabledEntries } from './sqlite';
@@ -160,6 +165,79 @@ export function writeProfilePlan(
   return backups;
 }
 
+export interface AppScopeOutcome {
+  /** 实际改动了多少个清单条目 */
+  changed: number;
+  backups: string[];
+}
+
+/**
+ * 改「全局共享」标记。
+ *
+ * 这个标记是扩展级的，写在 extensions.json 条目的 metadata 里，所以要把能找到该扩展的
+ * 清单都改一遍：全局清单，以及各配置自己的清单。实测确认 VS Code 认这个值——把它从
+ * true 改成 false 之后，扩展就不再跨配置出现了（见 .spike/appscope-test）。
+ */
+export function applyAppScopeChanges(
+  paths: UserDataPaths,
+  changes: AppScopeChange[],
+  stamp: string,
+): AppScopeOutcome {
+  const outcome: AppScopeOutcome = { changed: 0, backups: [] };
+  if (changes.length === 0) {
+    return outcome;
+  }
+
+  const targets = new Map(changes.map((c) => [c.extensionId, c.to]));
+
+  const files = new Set<string>([path.join(paths.extensionsDir, 'extensions.json')]);
+  for (const profile of readProfiles(paths.storageJson)) {
+    files.add(extensionListPath(paths, profile));
+  }
+
+  for (const file of files) {
+    let list: unknown;
+    try {
+      list = JSON.parse(fs.readFileSync(file, 'utf8'));
+    } catch {
+      continue;
+    }
+    if (!Array.isArray(list)) {
+      continue;
+    }
+
+    let touched = 0;
+    for (const entry of list as ExtensionEntry[]) {
+      const id = entry?.identifier?.id;
+      if (typeof id !== 'string') {
+        continue;
+      }
+      const to = targets.get(id);
+      if (to === undefined) {
+        continue;
+      }
+      if ((entry.metadata?.isApplicationScoped === true) === to) {
+        continue;
+      }
+      entry.metadata = { ...entry.metadata, isApplicationScoped: to };
+      touched += 1;
+    }
+
+    if (touched === 0) {
+      continue;
+    }
+    const backup = backupFile(file, stamp);
+    if (backup) {
+      outcome.backups.push(backup);
+    }
+    fs.writeFileSync(file, `${JSON.stringify(list, null, 4)}\n`, 'utf8');
+    pruneBackups(file);
+    outcome.changed += touched;
+  }
+
+  return outcome;
+}
+
 export interface ApplyOutcome {
   /** 成功写入的改动项数 */
   applied: number;
@@ -217,6 +295,18 @@ export function applyChanges(
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       outcome.errors.push(`写入「${profile.name}」失败：${message}`);
+    }
+  }
+
+  const appChanges = [...pending.values()].filter(isAppScopeChange);
+  if (appChanges.length > 0) {
+    try {
+      const scope = applyAppScopeChanges(paths, appChanges, stamp);
+      outcome.backups.push(...scope.backups);
+      outcome.applied += appChanges.length;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      outcome.errors.push(`写入「全局共享」标记失败：${message}`);
     }
   }
 

@@ -8,15 +8,20 @@ import { readProfiles } from './profileStore';
 import { isSqliteAvailable, readDisabledEntries } from './sqlite';
 import type { ExtensionEntry } from './types';
 
-/** 读取一次完整快照。找不到用户数据目录时返回空载荷而非抛错。 */
+/**
+ * 读取一次完整快照。找不到用户数据目录时返回空载荷而非抛错。
+ * appScopedOverrides 用来预览还没落盘的「全局共享」改动。
+ */
 export function loadSnapshot(
   paths: UserDataPaths | undefined = resolveUserDataPaths(),
+  appScopedOverrides?: Map<string, boolean>,
 ): MatrixPayload {
   if (!paths) {
     return {
       profiles: [],
       rows: [],
       pending: {},
+      appScopedPending: {},
       sqliteAvailable: isSqliteAvailable(),
       sourcePath: '(未找到 VS Code 用户数据目录)',
     };
@@ -41,8 +46,10 @@ export function loadSnapshot(
       disabledByProfile,
       allExtensions,
       meta: collectExtensionMeta(allExtensions),
+      appScopedOverrides,
     }),
     pending: {},
+    appScopedPending: {},
     sqliteAvailable: isSqliteAvailable(),
     sourcePath: paths.userDir,
   };

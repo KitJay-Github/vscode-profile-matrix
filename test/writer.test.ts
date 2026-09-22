@@ -4,7 +4,7 @@ import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
 import type { UserDataPaths } from '../src/core/paths';
-import { cellKey } from '../src/core/pendingQueue';
+import { appScopeKey, cellKey, type PendingChange } from '../src/core/pendingQueue';
 import { disabledDbPath } from '../src/core/profileFiles';
 import { planProfileWrites, type ProfileWriteContext } from '../src/core/writer';
 import { applyChanges } from '../src/core/writer';
@@ -150,18 +150,18 @@ function buildTempEnv(): { root: string; paths: UserDataPaths } {
 test('端到端：三项改动一起写盘', () => {
   const { root, paths } = buildTempEnv();
   try {
-    const pending = new Map([
+    const pending: Map<string, PendingChange> = new Map([
       [
         cellKey('-aaa', 'a.one'),
-        { extensionId: 'a.one', profileLocation: '-aaa', from: 'enabled' as const, to: 'disabled' as const },
+        { kind: 'cell', extensionId: 'a.one', profileLocation: '-aaa', from: 'enabled', to: 'disabled' },
       ],
       [
         cellKey('-aaa', 'a.two'),
-        { extensionId: 'a.two', profileLocation: '-aaa', from: 'disabled' as const, to: 'enabled' as const },
+        { kind: 'cell', extensionId: 'a.two', profileLocation: '-aaa', from: 'disabled', to: 'enabled' },
       ],
       [
         cellKey('-aaa', 'a.three'),
-        { extensionId: 'a.three', profileLocation: '-aaa', from: 'absent' as const, to: 'enabled' as const },
+        { kind: 'cell', extensionId: 'a.three', profileLocation: '-aaa', from: 'absent', to: 'enabled' },
       ],
     ]);
 
@@ -200,10 +200,10 @@ test('端到端：写入的值是 TEXT 而不是 BLOB', () => {
   try {
     applyChanges(
       paths,
-      new Map([
+      new Map<string, PendingChange>([
         [
           cellKey('-aaa', 'a.one'),
-          { extensionId: 'a.one', profileLocation: '-aaa', from: 'enabled' as const, to: 'disabled' as const },
+          { kind: 'cell', extensionId: 'a.one', profileLocation: '-aaa', from: 'enabled', to: 'disabled' },
         ],
       ]),
       'test-stamp',
@@ -227,10 +227,10 @@ test('端到端：不存在的配置文件被记进错误里', () => {
   try {
     const outcome = applyChanges(
       paths,
-      new Map([
+      new Map<string, PendingChange>([
         [
           cellKey('-does-not-exist', 'a.one'),
-          { extensionId: 'a.one', profileLocation: '-does-not-exist', from: 'enabled' as const, to: 'disabled' as const },
+          { kind: 'cell', extensionId: 'a.one', profileLocation: '-does-not-exist', from: 'enabled', to: 'disabled' },
         ],
       ]),
       'test-stamp',
@@ -245,10 +245,10 @@ test('端到端：不存在的配置文件被记进错误里', () => {
 test('备份超过保留份数时清理最旧的', () => {
   const { root, paths } = buildTempEnv();
   try {
-    const change = new Map([
+    const change: Map<string, PendingChange> = new Map([
       [
         cellKey('-aaa', 'a.one'),
-        { extensionId: 'a.one', profileLocation: '-aaa', from: 'enabled' as const, to: 'disabled' as const },
+        { kind: 'cell', extensionId: 'a.one', profileLocation: '-aaa', from: 'enabled', to: 'disabled' },
       ],
     ]);
     for (let i = 1; i <= 7; i += 1) {
@@ -259,6 +259,74 @@ test('备份超过保留份数时清理最旧的', () => {
       .readdirSync(path.join(profileDir, 'globalStorage'))
       .filter((n) => n.includes('.pm-backup-'));
     assert.ok(backups.length <= 5, `备份不应超过 5 份，实际 ${backups.length}`);
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('端到端：改全局共享标记会同时写全局清单和配置清单', () => {
+  const { root, paths } = buildTempEnv();
+  try {
+    const pending: Map<string, PendingChange> = new Map([
+      [
+        appScopeKey('a.one'),
+        { kind: 'appScope', extensionId: 'a.one', from: false, to: true },
+      ],
+    ]);
+    const outcome = applyChanges(paths, pending, 'scope-stamp');
+    assert.deepEqual(outcome.errors, []);
+    assert.equal(outcome.applied, 1);
+
+    const read = (p: string) =>
+      JSON.parse(fs.readFileSync(p, 'utf8')) as ExtensionEntry[];
+
+    const globalList = read(path.join(paths.extensionsDir, 'extensions.json'));
+    assert.equal(
+      globalList.find((e) => e.identifier.id === 'a.one')?.metadata?.isApplicationScoped,
+      true,
+    );
+
+    const profileList = read(path.join(paths.userDir, 'profiles', '-aaa', 'extensions.json'));
+    assert.equal(
+      profileList.find((e) => e.identifier.id === 'a.one')?.metadata?.isApplicationScoped,
+      true,
+    );
+
+    // 其他扩展保持原值（extEntry 默认标成 false）
+    assert.equal(
+      globalList.find((e) => e.identifier.id === 'a.two')?.metadata?.isApplicationScoped,
+      false,
+    );
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('端到端：全局共享标记已经对了就不重复写', () => {
+  const { root, paths } = buildTempEnv();
+  try {
+    const setScoped = (v: boolean) => {
+      const p = path.join(paths.extensionsDir, 'extensions.json');
+      const list = JSON.parse(fs.readFileSync(p, 'utf8')) as ExtensionEntry[];
+      for (const e of list) {
+        if (e.identifier.id === 'a.one') {
+          e.metadata = { ...e.metadata, isApplicationScoped: v };
+        }
+      }
+      fs.writeFileSync(p, JSON.stringify(list));
+    };
+    setScoped(true);
+
+    const pending: Map<string, PendingChange> = new Map([
+      [
+        appScopeKey('a.one'),
+        { kind: 'appScope', extensionId: 'a.one', from: true, to: true },
+      ],
+    ]);
+    const outcome = applyChanges(paths, pending, 'noop-stamp');
+    // 全局清单里已经是 true，配置清单里还是 undefined，所以只应该改后者
+    assert.deepEqual(outcome.errors, []);
+    assert.equal(outcome.backups.length, 1, '只应按需备份真正被改动的那个文件');
   } finally {
     fs.rmSync(root, { recursive: true, force: true });
   }
