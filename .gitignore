@@ -1,0 +1,7 @@
+node_modules/
+out/
+out-test/
+*.vsix
+.spike/write-test/
+.spike/iso-data/
+.superpowers/

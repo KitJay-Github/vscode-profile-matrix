@@ -1,0 +1,12 @@
+.vscode/**
+.github/**
+.spike/**
+test/**
+out-test/**
+src/**
+scripts/**
+docs/**
+**/*.map
+**/*.ts
+tsconfig.json
+esbuild.js

@@ -1,0 +1,45 @@
+{
+  "name": "vscode-profile-matrix",
+  "displayName": "Profile Matrix",
+  "description": "矩阵式管理 VS Code 配置文件与扩展的对应关系",
+  "version": "0.0.1",
+  "publisher": "local-dev",
+  "license": "MIT",
+  "engines": {
+    "vscode": "^1.128.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "keywords": [
+    "profile",
+    "extension",
+    "配置文件",
+    "扩展管理"
+  ],
+  "main": "./out/extension.js",
+  "activationEvents": [
+    "onStartupFinished"
+  ],
+  "contributes": {
+    "commands": [
+      {
+        "command": "profileMatrix.openPanel",
+        "title": "打开扩展矩阵",
+        "category": "Profile Matrix"
+      }
+    ]
+  },
+  "scripts": {
+    "build": "node esbuild.js --production",
+    "watch": "node esbuild.js --watch",
+    "check": "tsc --noEmit",
+    "test": "node esbuild.js && node scripts/run-tests.js"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.2",
+    "@types/vscode": "^1.128.0",
+    "esbuild": "^0.28.2",
+    "typescript": "^5.7.2"
+  }
+}
