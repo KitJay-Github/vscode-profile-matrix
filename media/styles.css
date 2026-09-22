@@ -1,6 +1,198 @@
+:root {
+  --pm-border: var(--vscode-panel-border, #3c3c3c);
+  --pm-on: var(--vscode-charts-blue, #0e639c);
+  --pm-off: var(--vscode-charts-orange, #c8912a);
+  --pm-muted: var(--vscode-descriptionForeground, #8a8a8a);
+}
+
 body {
   font-family: var(--vscode-font-family);
   color: var(--vscode-foreground);
   background: var(--vscode-editor-background);
-  padding: 12px;
+  margin: 0;
+  padding: 0;
+}
+
+.pm-bar {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--pm-border);
+  position: sticky;
+  top: 0;
+  background: var(--vscode-editor-background);
+  z-index: 2;
+}
+
+.pm-bar input {
+  flex: 1;
+  min-width: 80px;
+  background: var(--vscode-input-background);
+  color: var(--vscode-input-foreground);
+  border: 1px solid var(--vscode-input-border, transparent);
+  padding: 3px 8px;
+}
+
+.pm-filter {
+  display: flex;
+  border: 1px solid var(--pm-border);
+}
+
+.pm-filter button {
+  background: transparent;
+  color: var(--vscode-foreground);
+  border: 0;
+  padding: 3px 10px;
+  cursor: pointer;
+  font-size: 12px;
+}
+
+.pm-filter button[aria-pressed='true'] {
+  background: var(--pm-on);
+  color: #fff;
+}
+
+table {
+  border-collapse: collapse;
+  width: 100%;
+  font-size: 12px;
+}
+
+th,
+td {
+  border-bottom: 1px solid var(--pm-border);
+  padding: 0 8px;
+  height: 30px;
+  text-align: center;
+  white-space: nowrap;
+}
+
+th:first-child,
+td:first-child {
+  text-align: left;
+}
+
+thead th {
+  position: sticky;
+  top: 45px;
+  background: var(--vscode-editor-background);
+  color: var(--pm-muted);
+  font-weight: 500;
+  z-index: 1;
+}
+
+thead th small {
+  display: block;
+  font-size: 10px;
+  font-weight: 400;
+}
+
+th.pm-current {
+  color: var(--vscode-foreground);
+  box-shadow: inset 0 -2px 0 var(--pm-on);
+}
+
+tbody tr:hover td {
+  background: var(--vscode-list-hoverBackground);
+}
+
+.pm-name {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.pm-badge {
+  width: 16px;
+  height: 16px;
+  border-radius: 3px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 9px;
+  color: #fff;
+  background: var(--pm-muted);
+  flex: 0 0 auto;
+}
+
+.pm-sub {
+  color: var(--pm-muted);
+  font-size: 10px;
+}
+
+tr.pm-group td {
+  background: var(--vscode-sideBar-background);
+  color: var(--pm-muted);
+  font-size: 11px;
+  text-align: left;
+  height: 24px;
+}
+
+.cell {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  border-radius: 3px;
+  border: 1px solid var(--pm-muted);
+}
+
+.cell.enabled {
+  background: var(--pm-on);
+  border-color: var(--pm-on);
+}
+
+.cell.disabled {
+  background: repeating-linear-gradient(
+    45deg,
+    transparent,
+    transparent 3px,
+    var(--pm-off) 3px,
+    var(--pm-off) 4px
+  );
+  border-color: var(--pm-off);
+}
+
+.cell.absent {
+  background: transparent;
+  border-color: var(--pm-border);
+}
+
+.cell.global {
+  border-radius: 50%;
+  background: transparent;
+  border-color: var(--pm-border);
+}
+
+td.pm-clickable {
+  cursor: pointer;
+}
+
+.pm-legend {
+  display: flex;
+  gap: 16px;
+  padding: 10px 12px;
+  color: var(--pm-muted);
+  font-size: 11px;
+  flex-wrap: wrap;
+}
+
+.pm-legend span {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.pm-empty {
+  padding: 24px;
+  color: var(--pm-muted);
+}
+
+.pm-warn {
+  margin: 8px 12px;
+  padding: 6px 10px;
+  border-left: 3px solid var(--pm-off);
+  background: var(--vscode-inputValidation-warningBackground, rgba(200, 145, 42, 0.1));
+  color: var(--vscode-foreground);
+  font-size: 12px;
 }
