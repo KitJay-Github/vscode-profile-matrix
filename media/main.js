@@ -275,7 +275,12 @@ function renderNameCell(row) {
 
   const text = document.createElement('div');
   const title = document.createElement('div');
+  title.className = 'pm-name-title';
   title.textContent = row.name;
+  title.title = '在应用商店中查看';
+  title.addEventListener('click', () => {
+    vscode.postMessage({ type: 'openInMarketplace', extensionId: row.id });
+  });
   const sub = document.createElement('div');
   sub.className = 'pm-sub';
   sub.textContent = `${row.publisher} · ${row.id}`;

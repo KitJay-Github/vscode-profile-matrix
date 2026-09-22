@@ -127,6 +127,15 @@ tbody tr:hover td {
   object-fit: contain;
 }
 
+.pm-name-title {
+  cursor: pointer;
+}
+
+.pm-name-title:hover {
+  color: var(--vscode-textLink-foreground, #3794ff);
+  text-decoration: underline;
+}
+
 .pm-sub {
   color: var(--pm-muted);
   font-size: 10px;

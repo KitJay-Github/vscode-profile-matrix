@@ -33,4 +33,5 @@ export type WebviewToHostMessage =
   | { type: 'applyChanges' }
   | { type: 'discardChanges' }
   | { type: 'switchProfile'; location: string }
-  | { type: 'openNativeExtensions'; extensionId: string };
+  | { type: 'openNativeExtensions'; extensionId: string }
+  | { type: 'openInMarketplace'; extensionId: string };

@@ -169,6 +169,13 @@ export class MatrixPanel {
           `@id:${msg.extensionId}`,
         );
         return;
+      case 'openInMarketplace':
+        await vscode.env.openExternal(
+          vscode.Uri.parse(
+            `https://marketplace.visualstudio.com/items?itemName=${encodeURIComponent(msg.extensionId)}`,
+          ),
+        );
+        return;
     }
   }
 
