@@ -54,7 +54,7 @@ VS Code 自 1.75 起内置了 Profiles（配置文件），但原生 UI 在「�
 | 配置文件注册表 | `globalStorage/storage.json` → `userDataProfiles` | JSON 数组，元素 `{location, name, icon?, useDefaultFlags?}` |
 | 配置文件与工作区的关联 | 同上 → `profileAssociations.workspaces` | `{工作区URI: profileId}` |
 | 某配置装了哪些扩展 | `profiles/<location>/extensions.json` | JSON 数组，元素 `{identifier:{id,uuid}, version, location, relativeLocation, metadata}` |
-| 某配置禁用了哪些扩展 | `profiles/<location>/globalStorage/state.vscdb` → key `extensionsIdentifiers/disabled` | SQLite `ItemTable(key TEXT UNIQUE, value BLOB)`，value 是 `[{"id":..,"uuid":..}]` |
+| 某配置禁用了哪些扩展 | `profiles/<location>/globalStorage/state.vscdb` → key `extensionsIdentifiers/disabled` | SQLite `ItemTable(key TEXT UNIQUE ON CONFLICT REPLACE, value BLOB)`，**但实际写入的值是 TEXT 类型**，内容是 `[{"id":..,"uuid":..}]`。见下方警示 |
 | 默认 Profile | 无独立目录，数据就在 `User/` 根下；其 id 恒为 `__default__profile__` | — |
 | 全局扩展安装索引 | `~/.vscode/extensions/extensions.json` | 同时是默认 profile 的扩展清单 |
 
@@ -62,6 +62,7 @@ VS Code 自 1.75 起内置了 Profiles（配置文件），但原生 UI 在「�
 - `location` 是相对 `profiles/` 的**目录名**（形如 `-19496b3a`，由 `hash(uuid).toString(16)` 生成，与名称无关），**不是** profile 名称
 - `userDataProfiles` 中**没有 id 字段**
 - 内置 profile `Agents` 的 location 是 `builtin/agents`，`useDefaultFlags` 全 true
+- **⚠️ 写值必须是 TEXT，不能是 BLOB**。VS Code 存的是 TEXT 并直接 `JSON.parse`；写成 BLOB 会让它读成 Buffer，`JSON.parse(Buffer)` 得到 `"91,123,34,..."` 这种数字串而抛错。该异常发生在扩展管理器初始化路径上，会导致**所有扩展都不激活**（详见 `.spike/RESULT.md`）
 
 ### 2.3 扩展在矩阵中的四种状态
 
@@ -273,4 +274,6 @@ media/
 
 **判定**：若不在 → 写入链路成立，按 §3.2 实现；若仍在 → 禁用状态改文件无效，写侧降级为「安装/卸载路径」（官方命令 `workbench.extensions.installExtension` / `uninstallExtension`）+ 跳转原生 UI。
 
-**当前状态**：读侧已实测通过；写侧待此 spike 验证。
+**当前状态（2026-09-22 已完成）**：读侧与写侧均已实测通过。写侧的完整结论、三组对照数据、以及踩到的 TEXT/BLOB 坑记录在 `.spike/RESULT.md`。
+
+**关键结论**：写入 `state.vscdb` 时值必须是 **TEXT** 类型（传字符串，不要包 Buffer）。写成 BLOB 会让 `JSON.parse` 抛错，而该异常发生在扩展管理器初始化路径上，会导致**所有扩展都不激活**。写侧因此确定走 §3.2 的「待应用队列」，无需降级。

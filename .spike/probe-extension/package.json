@@ -1,0 +1,12 @@
+{
+  "name": "profile-matrix-probe",
+  "publisher": "spike",
+  "version": "1.0.0",
+  "engines": {
+    "vscode": "^1.128.0"
+  },
+  "main": "./extension.js",
+  "activationEvents": [
+    "*"
+  ]
+}
