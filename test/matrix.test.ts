@@ -37,7 +37,7 @@ test('uriPathToLocal 去掉 Windows 盘符前的斜杠', () => {
   assert.equal(uriPathToLocal('/home/x/ext'), '/home/x/ext');
 });
 
-test('全局共享的扩展在所有列都是 global，且归入 global 组', () => {
+test('全局共享的扩展在所有列都是 global，归入主列表而非单列一组', () => {
   const rows = buildMatrix({
     profiles: PROFILES,
     installedByProfile: new Map([['-aaa', [entry('a.one'), entry('ms-vscode.cpptools', true)]]]),
@@ -45,7 +45,8 @@ test('全局共享的扩展在所有列都是 global，且归入 global 组', ()
     allExtensions: [entry('a.one'), entry('ms-vscode.cpptools', true)],
   });
   const shared = rows.find((r) => r.id === 'ms-vscode.cpptools');
-  assert.equal(shared?.group, 'global');
+  assert.equal(shared?.group, 'managed');
+  assert.equal(shared?.appScoped, true);
   assert.deepEqual(shared?.cells, {
     __default__profile__: 'global',
     '-aaa': 'global',
@@ -91,7 +92,7 @@ test('只出现在某个配置清单里、不在全局清单里的扩展也会�
   assert.equal(rows[0].group, 'managed');
 });
 
-test('排序为 managed → global → orphan', () => {
+test('排序为 managed → orphan', () => {
   const rows = buildMatrix({
     profiles: PROFILES,
     installedByProfile: new Map([['-aaa', [entry('z.managed')]]]),
@@ -100,7 +101,7 @@ test('排序为 managed → global → orphan', () => {
   });
   assert.deepEqual(
     rows.map((r) => r.group),
-    ['managed', 'global', 'orphan'],
+    ['managed', 'managed', 'orphan'],
   );
 });
 

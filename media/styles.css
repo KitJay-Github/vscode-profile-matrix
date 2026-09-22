@@ -183,10 +183,58 @@ tr.pm-group td {
   border-color: var(--pm-border);
 }
 
-.cell.global {
-  border-radius: 50%;
+/* 全局共享时，配置列不适用：给个破折号占位，且不可点 */
+.cell.not-applicable {
+  width: auto;
+  min-width: 14px;
+  border-color: transparent;
   background: transparent;
-  border-color: var(--pm-border);
+  color: var(--pm-border);
+  font-size: 12px;
+}
+
+/* 「全局」列：滑块开关 */
+.pm-scope-col {
+  width: 58px;
+}
+
+.pm-scope {
+  position: relative;
+  display: inline-block;
+  vertical-align: middle;
+  width: 30px;
+  height: 16px;
+  border: 1px solid var(--pm-border);
+  border-radius: 8px;
+  background: var(--vscode-input-background, #3c3c3c);
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.pm-scope-knob {
+  position: absolute;
+  top: 1px;
+  left: 1px;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--pm-muted);
+  transition: transform 0.15s, background 0.15s;
+}
+
+.pm-scope.on {
+  background: var(--pm-on);
+  border-color: var(--pm-on);
+}
+
+.pm-scope.on .pm-scope-knob {
+  transform: translateX(14px);
+  background: #fff;
+}
+
+.pm-scope.pending {
+  outline: 1px dashed var(--vscode-foreground);
+  outline-offset: 2px;
 }
 
 td.pm-cell-clickable {

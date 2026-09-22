@@ -26,8 +26,12 @@ export type CellState =
   /** 全局共享，不归任何配置管 */
   | 'global';
 
-/** 扩展所属分组 */
-export type RowGroup = 'managed' | 'global' | 'orphan';
+/**
+ * 扩展所属分组。
+ * 「全局共享」不再单列一组——它由矩阵里的「全局」开关那一列表达，
+ * 因为分到另一组会让整行在界面上跳来跳去。
+ */
+export type RowGroup = 'managed' | 'orphan';
 
 /** 矩阵中的一行 */
 export interface MatrixRow {

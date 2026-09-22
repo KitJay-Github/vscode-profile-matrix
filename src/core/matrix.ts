@@ -15,7 +15,7 @@ export interface MatrixInput {
   appScopedOverrides?: Map<string, boolean>;
 }
 
-const GROUP_ORDER: Record<RowGroup, number> = { managed: 0, global: 1, orphan: 2 };
+const GROUP_ORDER: Record<RowGroup, number> = { managed: 0, orphan: 1 };
 
 /**
  * 把三方数据拼成矩阵行（纯函数）。
@@ -85,7 +85,8 @@ export function buildMatrix(input: MatrixInput): MatrixRow[] {
         : 'enabled';
     }
 
-    const group: RowGroup = isGlobal ? 'global' : installedAnywhere ? 'managed' : 'orphan';
+    // 全局共享的也在「管得着」那一组里——它是不是全局，由「全局」那一列说
+    const group: RowGroup = isGlobal || installedAnywhere ? 'managed' : 'orphan';
     const [publisher = '', ...rest] = id.split('.');
     const fallbackName = rest.length > 0 ? rest.join('.') : id;
     const info = meta?.get(id);
@@ -104,9 +105,12 @@ export function buildMatrix(input: MatrixInput): MatrixRow[] {
   return rows;
 }
 
-/** 各配置之间的状态是否不一致（全局共享的格子不参与比较） */
+/** 各配置之间的状态是否不一致。全局共享的扩展各列本来就一样，不算差异。 */
 export function hasDifference(row: MatrixRow): boolean {
-  const states = Object.values(row.cells).filter((s) => s !== 'global');
+  if (row.appScoped) {
+    return false;
+  }
+  const states = Object.values(row.cells);
   if (states.length < 2) {
     return false;
   }

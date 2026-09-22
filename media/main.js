@@ -5,14 +5,13 @@ const state = {
   payload: null,
   query: '',
   filter: 'all',
-  collapsed: { global: true, orphan: true },
+  collapsed: { orphan: true },
 };
 
-const GROUP_ORDER = ['managed', 'global', 'orphan'];
+const GROUP_ORDER = ['managed', 'orphan'];
 
 const GROUP_LABEL = {
-  managed: '由配置文件管理',
-  global: '全局共享 · 不归配置文件管',
+  managed: '扩展',
   orphan: '装了但没用上',
 };
 
@@ -20,13 +19,12 @@ const CELL_TITLE = {
   enabled: '已启用',
   disabled: '已装但禁用',
   absent: '该配置未装',
-  global: '全局共享，不随配置变化',
 };
 
 const FILTERS = [
   ['all', '全部'],
   ['diff', '有差异'],
-  ['managed', '仅配置级'],
+  ['scope', '仅全局'],
 ];
 
 // 外壳只建一次，之后只重建表格：否则每次敲键盘都会重建输入框，焦点会丢。
@@ -40,6 +38,9 @@ function summarize(rows, profileLocation) {
   let installed = 0;
   let disabled = 0;
   for (const row of rows) {
+    if (row.appScoped) {
+      continue;
+    }
     const cell = row.cells[profileLocation];
     if (cell === 'enabled' || cell === 'disabled') {
       installed += 1;
@@ -51,13 +52,19 @@ function summarize(rows, profileLocation) {
   return `${installed} 装 · ${installed - disabled} 启用 · ${disabled} 禁用`;
 }
 
+function rowHasDifference(row) {
+  if (row.appScoped) {
+    return false;
+  }
+  return new Set(Object.values(row.cells)).size > 1;
+}
+
 function matchesFilter(row) {
-  if (state.filter === 'managed') {
-    return row.group === 'managed';
+  if (state.filter === 'scope') {
+    return row.appScoped;
   }
   if (state.filter === 'diff') {
-    const cells = Object.values(row.cells).filter((c) => c !== 'global');
-    return new Set(cells).size > 1;
+    return rowHasDifference(row);
   }
   return true;
 }
@@ -73,6 +80,10 @@ function matchesQuery(row) {
 function pendingOf(profileLocation, extensionId) {
   const pending = state.payload?.pending || {};
   return pending[`${profileLocation}|${extensionId}`];
+}
+
+function appScopePendingOf(extensionId) {
+  return state.payload?.appScopedPending?.[extensionId];
 }
 
 function updateFilterButtons() {
@@ -113,6 +124,7 @@ function showMenu(x, y, items) {
 
 document.addEventListener('click', closeMenu);
 document.addEventListener('contextmenu', (event) => {
+  // 只在右键点到别处时关掉已有菜单；格子自己会处理它那次右键
   if (!event.target.closest('.pm-cell-clickable')) {
     closeMenu();
   }
@@ -159,7 +171,7 @@ function buildShell() {
 
   const legend = document.createElement('div');
   legend.className = 'pm-legend';
-  for (const key of ['enabled', 'disabled', 'absent', 'global']) {
+  for (const key of ['enabled', 'disabled', 'absent']) {
     const item = document.createElement('span');
     const dot = document.createElement('span');
     dot.className = `cell ${key}`;
@@ -167,10 +179,18 @@ function buildShell() {
     item.appendChild(document.createTextNode(CELL_TITLE[key]));
     legend.appendChild(item);
   }
-  const actions = document.createElement('span');
-  actions.className = 'pm-legend-hint';
-  actions.textContent = '点格子切换 · 右键移出配置';
-  legend.appendChild(actions);
+  const na = document.createElement('span');
+  const naDot = document.createElement('span');
+  naDot.className = 'cell not-applicable';
+  naDot.textContent = '—';
+  na.appendChild(naDot);
+  na.appendChild(document.createTextNode('全局共享，不按配置分'));
+  legend.appendChild(na);
+
+  const hint = document.createElement('span');
+  hint.className = 'pm-legend-hint';
+  hint.textContent = '点格子切换 · 右键移出配置';
+  legend.appendChild(hint);
   app.appendChild(legend);
 
   applyHost = document.createElement('div');
@@ -198,7 +218,8 @@ function renderWarnings(payload) {
 
 function renderApplyBar() {
   applyHost.textContent = '';
-  const count = Object.keys(state.payload?.pending || {}).length;
+  const count = Object.keys(state.payload?.pending || {}).length +
+    Object.keys(state.payload?.appScopedPending || {}).length;
   if (count === 0) {
     return;
   }
@@ -277,33 +298,9 @@ function renderNameCell(row) {
   const title = document.createElement('div');
   title.className = 'pm-name-title';
   title.textContent = row.name;
-
-  const appPending = state.payload?.appScopedPending?.[row.id];
-  const effectiveAppScoped = appPending !== undefined ? appPending : row.appScoped;
-  if (appPending !== undefined) {
-    title.classList.add('pm-name-pending');
-  }
-  title.title =
-    appPending !== undefined
-      ? `待应用：将改为${appPending ? '全局共享' : '按配置单独管理'}`
-      : '点击去应用商店 · 右键切换「全局共享 / 按配置单独管理」';
-
+  title.title = '点击去应用商店';
   title.addEventListener('click', () => {
     vscode.postMessage({ type: 'openInMarketplace', extensionId: row.id });
-  });
-  title.addEventListener('contextmenu', (event) => {
-    event.preventDefault();
-    showMenu(event.clientX, event.clientY, [
-      {
-        label:
-          appPending !== undefined
-            ? '撤销这项改动'
-            : effectiveAppScoped
-              ? '改为按配置单独管理'
-              : '改为全局共享（所有配置一致）',
-        run: () => vscode.postMessage({ type: 'toggleAppScope', extensionId: row.id }),
-      },
-    ]);
   });
   const sub = document.createElement('div');
   sub.className = 'pm-sub';
@@ -315,23 +312,55 @@ function renderNameCell(row) {
   return td;
 }
 
+/** 「全局」那一列：滑块开关。开着时后面的配置列全部失效。 */
+function renderScopeCell(row) {
+  const td = document.createElement('td');
+  const pending = appScopePendingOf(row.id);
+  const effective = pending !== undefined ? pending : row.appScoped;
+
+  const sw = document.createElement('span');
+  sw.className = `pm-scope${effective ? ' on' : ''}${pending !== undefined ? ' pending' : ''}`;
+  sw.title =
+    pending !== undefined
+      ? `待应用：将改为${effective ? '全局共享' : '按配置单独管理'}（再点一次撤销）`
+      : effective
+        ? '全局共享：所有配置里都一样。点一下改为按配置单独管理'
+        : '按配置单独管理。点一下改为全局共享';
+
+  const knob = document.createElement('span');
+  knob.className = 'pm-scope-knob';
+  sw.appendChild(knob);
+
+  sw.addEventListener('click', () => {
+    vscode.postMessage({ type: 'toggleAppScope', extensionId: row.id });
+  });
+
+  td.appendChild(sw);
+  return td;
+}
+
 function renderCell(row, profile) {
   const td = document.createElement('td');
+  const cell = document.createElement('span');
+
+  if (row.appScoped) {
+    // 全局共享时这一列不适用：不能点，只给个占位符
+    cell.className = 'cell not-applicable';
+    cell.textContent = '—';
+    cell.title = '这个扩展是全局共享的，先关掉左边的「全局」才能按配置单独设置';
+    td.appendChild(cell);
+    return td;
+  }
+
   const current = row.cells[profile.location] || 'absent';
   const target = pendingOf(profile.location, row.id);
   const shown = target || current;
 
-  const cell = document.createElement('span');
   cell.className = `cell ${shown}${target ? ' pending' : ''}`;
   cell.title = target
     ? `待应用：${CELL_TITLE[current]} → ${CELL_TITLE[target]}（再点一次撤销）`
     : CELL_TITLE[current];
   td.appendChild(cell);
-
-  if (current === 'global') {
-    // 全局共享的扩展不归配置管，点了也没用
-    return td;
-  }
 
   td.classList.add('pm-cell-clickable');
   td.addEventListener('click', () => {
@@ -379,13 +408,22 @@ function renderTable() {
     return;
   }
 
+  const columnCount = payload.profiles.length + 2;
   const table = document.createElement('table');
 
   const thead = document.createElement('thead');
   const headRow = document.createElement('tr');
+
   const corner = document.createElement('th');
   corner.textContent = '扩展';
   headRow.appendChild(corner);
+
+  const scopeTh = document.createElement('th');
+  scopeTh.className = 'pm-scope-col';
+  scopeTh.textContent = '全局';
+  scopeTh.title = '打开＝所有配置里都一样，后面的配置列不再适用';
+  headRow.appendChild(scopeTh);
+
   for (const profile of payload.profiles) {
     const th = document.createElement('th');
     if (profile.location === payload.currentProfileLocation) {
@@ -406,16 +444,21 @@ function renderTable() {
     if (rows.length === 0) {
       continue;
     }
-    tbody.appendChild(renderGroupHeader(group, rows.length, payload.profiles.length + 1));
-    if (!state.collapsed[group]) {
-      for (const row of rows) {
-        const tr = document.createElement('tr');
-        tr.appendChild(renderNameCell(row));
-        for (const profile of payload.profiles) {
-          tr.appendChild(renderCell(row, profile));
-        }
-        tbody.appendChild(tr);
+    // 主列表不加组头，直接铺开；只有「装了但没用上」才需要分隔与折叠
+    if (group !== 'managed') {
+      tbody.appendChild(renderGroupHeader(group, rows.length, columnCount));
+      if (state.collapsed[group]) {
+        continue;
       }
+    }
+    for (const row of rows) {
+      const tr = document.createElement('tr');
+      tr.appendChild(renderNameCell(row));
+      tr.appendChild(renderScopeCell(row));
+      for (const profile of payload.profiles) {
+        tr.appendChild(renderCell(row, profile));
+      }
+      tbody.appendChild(tr);
     }
   }
   table.appendChild(tbody);
