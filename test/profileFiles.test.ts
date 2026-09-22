@@ -2,7 +2,7 @@ import { strict as assert } from 'node:assert';
 import { test } from 'node:test';
 import * as path from 'path';
 import type { UserDataPaths } from '../src/core/paths';
-import { disabledDbPath, extensionListPath } from '../src/core/snapshot';
+import { disabledDbPath, extensionListPath } from '../src/core/profileFiles';
 import type { ProfileInfo } from '../src/core/types';
 
 const PATHS: UserDataPaths = {

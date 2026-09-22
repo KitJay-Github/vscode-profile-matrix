@@ -110,7 +110,7 @@ test('显示名优先取传入的映射，否则从 id 推导', () => {
     installedByProfile: new Map([['-aaa', [entry('candycium.keil-assistant-new')]]]),
     disabledByProfile: new Map(),
     allExtensions: [entry('candycium.keil-assistant-new')],
-    displayNames: new Map([['candycium.keil-assistant-new', 'Keil Assistant']]),
+    meta: new Map([['candycium.keil-assistant-new', { displayName: 'Keil Assistant' }]]),
   });
   assert.equal(rows[0].name, 'Keil Assistant');
   assert.equal(rows[0].publisher, 'candycium');

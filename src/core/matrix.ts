@@ -1,3 +1,4 @@
+import type { ExtensionMeta } from './extensionStore';
 import type { CellState, ExtensionEntry, MatrixRow, ProfileInfo, RowGroup } from './types';
 
 export interface MatrixInput {
@@ -8,8 +9,8 @@ export interface MatrixInput {
   disabledByProfile: Map<string, Set<string>>;
   /** 全局已下载的扩展（用来找出「装了但没用上」的） */
   allExtensions: ExtensionEntry[];
-  /** 扩展 id -> 展示名 */
-  displayNames?: Map<string, string>;
+  /** 扩展 id -> 展示名与图标 */
+  meta?: Map<string, ExtensionMeta>;
 }
 
 const GROUP_ORDER: Record<RowGroup, number> = { managed: 0, global: 1, orphan: 2 };
@@ -23,7 +24,7 @@ const GROUP_ORDER: Record<RowGroup, number> = { managed: 0, global: 1, orphan: 2
  *   3. 是否在该配置的禁用列表里 → 在就是 disabled，否则 enabled
  */
 export function buildMatrix(input: MatrixInput): MatrixRow[] {
-  const { profiles, installedByProfile, disabledByProfile, allExtensions, displayNames } = input;
+  const { profiles, installedByProfile, disabledByProfile, allExtensions, meta } = input;
 
   const known = new Map<string, ExtensionEntry>();
   const globalIds = new Set<string>();
@@ -67,12 +68,14 @@ export function buildMatrix(input: MatrixInput): MatrixRow[] {
     const group: RowGroup = isGlobal ? 'global' : installedAnywhere ? 'managed' : 'orphan';
     const [publisher = '', ...rest] = id.split('.');
     const fallbackName = rest.length > 0 ? rest.join('.') : id;
+    const info = meta?.get(id);
     rows.push({
       id,
-      name: displayNames?.get(id) ?? fallbackName,
+      name: info?.displayName ?? fallbackName,
       publisher,
       group,
       cells,
+      iconPath: info?.iconPath,
     });
   }
 

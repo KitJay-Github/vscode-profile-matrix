@@ -116,6 +116,17 @@ tbody tr:hover td {
   flex: 0 0 auto;
 }
 
+/* 有真实图标时不要那层底色 */
+.pm-badge-icon {
+  background: transparent;
+}
+
+.pm-badge img {
+  width: 16px;
+  height: 16px;
+  object-fit: contain;
+}
+
 .pm-sub {
   color: var(--pm-muted);
   font-size: 10px;
@@ -164,7 +175,7 @@ tr.pm-group td {
   border-color: var(--pm-border);
 }
 
-td.pm-clickable {
+td.pm-cell-clickable {
   cursor: pointer;
 }
 
@@ -195,4 +206,100 @@ td.pm-clickable {
   background: var(--vscode-inputValidation-warningBackground, rgba(200, 145, 42, 0.1));
   color: var(--vscode-foreground);
   font-size: 12px;
+}
+
+.pm-warn-error {
+  border-left-color: var(--vscode-errorForeground, #f48771);
+  background: var(--vscode-inputValidation-errorBackground, rgba(244, 135, 113, 0.1));
+}
+
+.pm-legend-hint {
+  margin-left: auto;
+  opacity: 0.75;
+}
+
+.pm-cell-clickable:hover {
+  background: var(--vscode-list-activeSelectionBackground);
+}
+
+/* 待应用：显示的是目标状态的颜色，但用虚线边框标明还没落盘 */
+.cell.pending {
+  outline: 1px dashed var(--vscode-foreground);
+  outline-offset: 2px;
+}
+
+/* 底部应用条 */
+.pm-apply-bar {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  padding: 8px 14px;
+  background: var(--vscode-editorWidget-background, var(--vscode-editor-background));
+  border-top: 1px solid var(--pm-border);
+  box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.25);
+  font-size: 12px;
+  z-index: 10;
+}
+
+.pm-apply-count {
+  font-weight: 600;
+}
+
+.pm-apply-hint {
+  color: var(--pm-muted);
+  margin-right: auto;
+}
+
+.pm-apply-bar button {
+  background: var(--vscode-button-secondaryBackground, #3a3d41);
+  color: var(--vscode-button-secondaryForeground, #ccc);
+  border: 0;
+  padding: 4px 14px;
+  border-radius: 2px;
+  cursor: pointer;
+}
+
+.pm-apply-bar button.pm-primary {
+  background: var(--vscode-button-background, #0e639c);
+  color: var(--vscode-button-foreground, #fff);
+}
+
+.pm-apply-bar button:hover {
+  filter: brightness(1.15);
+}
+
+/* 给底部条让出位置 */
+body {
+  padding-bottom: 52px;
+}
+
+/* 右键菜单 */
+.pm-menu {
+  position: fixed;
+  min-width: 140px;
+  padding: 3px 0;
+  background: var(--vscode-menu-background, var(--vscode-editorWidget-background));
+  border: 1px solid var(--pm-border);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
+  z-index: 20;
+}
+
+.pm-menu button {
+  display: block;
+  width: 100%;
+  padding: 5px 12px;
+  background: transparent;
+  color: var(--vscode-menu-foreground, var(--vscode-foreground));
+  border: 0;
+  font-size: 12px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.pm-menu button:hover {
+  background: var(--vscode-menu-selectionBackground, var(--vscode-list-hoverBackground));
 }

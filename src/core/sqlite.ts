@@ -10,6 +10,7 @@ export const DISABLED_KEY = 'extensionsIdentifiers/disabled';
 interface SqliteStatement {
   get(...params: unknown[]): unknown;
   all(...params: unknown[]): unknown[];
+  run(...params: unknown[]): unknown;
 }
 
 interface SqliteDatabase {

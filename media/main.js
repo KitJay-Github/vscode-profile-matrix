@@ -34,6 +34,7 @@ let searchInput;
 let filterButtons = [];
 let tableHost;
 let warnHost;
+let applyHost;
 
 function summarize(rows, profileLocation) {
   let installed = 0;
@@ -69,11 +70,55 @@ function matchesQuery(row) {
   return row.id.toLowerCase().includes(q) || row.name.toLowerCase().includes(q);
 }
 
+function pendingOf(profileLocation, extensionId) {
+  const pending = state.payload?.pending || {};
+  return pending[`${profileLocation}|${extensionId}`];
+}
+
 function updateFilterButtons() {
   for (const { key, btn } of filterButtons) {
     btn.setAttribute('aria-pressed', String(state.filter === key));
   }
 }
+
+// ---------- 右键菜单 ----------
+
+let openMenu;
+
+function closeMenu() {
+  if (openMenu) {
+    openMenu.remove();
+    openMenu = undefined;
+  }
+}
+
+function showMenu(x, y, items) {
+  closeMenu();
+  const menu = document.createElement('div');
+  menu.className = 'pm-menu';
+  menu.style.left = `${x}px`;
+  menu.style.top = `${y}px`;
+  for (const item of items) {
+    const btn = document.createElement('button');
+    btn.textContent = item.label;
+    btn.addEventListener('click', () => {
+      closeMenu();
+      item.run();
+    });
+    menu.appendChild(btn);
+  }
+  document.body.appendChild(menu);
+  openMenu = menu;
+}
+
+document.addEventListener('click', closeMenu);
+document.addEventListener('contextmenu', (event) => {
+  if (!event.target.closest('.pm-cell-clickable')) {
+    closeMenu();
+  }
+});
+
+// ---------- 渲染 ----------
 
 function buildShell() {
   app.textContent = '';
@@ -122,7 +167,14 @@ function buildShell() {
     item.appendChild(document.createTextNode(CELL_TITLE[key]));
     legend.appendChild(item);
   }
+  const actions = document.createElement('span');
+  actions.className = 'pm-legend-hint';
+  actions.textContent = '点格子切换 · 右键移出配置';
+  legend.appendChild(actions);
   app.appendChild(legend);
+
+  applyHost = document.createElement('div');
+  app.appendChild(applyHost);
 
   updateFilterButtons();
 }
@@ -133,9 +185,49 @@ function renderWarnings(payload) {
     const warn = document.createElement('div');
     warn.className = 'pm-warn';
     warn.textContent =
-      '当前 VS Code 版本不支持内置 SQLite，读不到「已装但禁用」的状态，矩阵已降级为只读。';
+      '当前 VS Code 版本不支持内置 SQLite，既读不到也改不了「已装但禁用」的状态，面板已降级为只读。';
     warnHost.appendChild(warn);
   }
+  if (payload.profiles.length === 0) {
+    const warn = document.createElement('div');
+    warn.className = 'pm-warn';
+    warn.textContent = `没有找到配置文件。数据源：${payload.sourcePath}`;
+    warnHost.appendChild(warn);
+  }
+}
+
+function renderApplyBar() {
+  applyHost.textContent = '';
+  const count = Object.keys(state.payload?.pending || {}).length;
+  if (count === 0) {
+    return;
+  }
+
+  const bar = document.createElement('div');
+  bar.className = 'pm-apply-bar';
+
+  const text = document.createElement('span');
+  text.className = 'pm-apply-count';
+  text.textContent = `${count} 项改动待应用`;
+  bar.appendChild(text);
+
+  const hint = document.createElement('span');
+  hint.className = 'pm-apply-hint';
+  hint.textContent = '需完全退出 VS Code 后生效';
+  bar.appendChild(hint);
+
+  const apply = document.createElement('button');
+  apply.className = 'pm-primary';
+  apply.textContent = '应用';
+  apply.addEventListener('click', () => vscode.postMessage({ type: 'applyChanges' }));
+  bar.appendChild(apply);
+
+  const discard = document.createElement('button');
+  discard.textContent = '放弃';
+  discard.addEventListener('click', () => vscode.postMessage({ type: 'discardChanges' }));
+  bar.appendChild(discard);
+
+  applyHost.appendChild(bar);
 }
 
 function renderGroupHeader(group, count, colspan) {
@@ -154,16 +246,33 @@ function renderGroupHeader(group, count, colspan) {
   return tr;
 }
 
-function renderRow(row, profiles) {
-  const tr = document.createElement('tr');
-
-  const nameTd = document.createElement('td');
+function renderNameCell(row) {
+  const td = document.createElement('td');
   const wrap = document.createElement('div');
   wrap.className = 'pm-name';
+
   const badge = document.createElement('span');
   badge.className = 'pm-badge';
-  badge.textContent = (row.name[0] || '?').toUpperCase();
+  const fallback = () => {
+    badge.textContent = (row.name[0] || '?').toUpperCase();
+  };
+  if (row.iconUri) {
+    badge.classList.add('pm-badge-icon');
+    const img = document.createElement('img');
+    img.src = row.iconUri;
+    img.alt = '';
+    // 图标加载失败就退回首字母色块，别留个破图
+    img.addEventListener('error', () => {
+      img.remove();
+      badge.classList.remove('pm-badge-icon');
+      fallback();
+    });
+    badge.appendChild(img);
+  } else {
+    fallback();
+  }
   wrap.appendChild(badge);
+
   const text = document.createElement('div');
   const title = document.createElement('div');
   title.textContent = row.name;
@@ -173,41 +282,61 @@ function renderRow(row, profiles) {
   text.appendChild(title);
   text.appendChild(sub);
   wrap.appendChild(text);
-  nameTd.appendChild(wrap);
-  tr.appendChild(nameTd);
+  td.appendChild(wrap);
+  return td;
+}
 
-  for (const profile of profiles) {
-    const td = document.createElement('td');
-    const cellState = row.cells[profile.location] || 'absent';
-    const cell = document.createElement('span');
-    cell.className = `cell ${cellState}`;
-    cell.title = CELL_TITLE[cellState];
-    td.appendChild(cell);
-    if (cellState !== 'global') {
-      // 全局共享的扩展不归配置管，点了也没用，所以不做成可点击
-      td.className = 'pm-clickable';
-      td.title = '在原生扩展面板中查看';
-      td.addEventListener('click', () => {
-        vscode.postMessage({ type: 'openNativeExtensions', extensionId: row.id });
-      });
-    }
-    tr.appendChild(td);
+function renderCell(row, profile) {
+  const td = document.createElement('td');
+  const current = row.cells[profile.location] || 'absent';
+  const target = pendingOf(profile.location, row.id);
+  const shown = target || current;
+
+  const cell = document.createElement('span');
+  cell.className = `cell ${shown}${target ? ' pending' : ''}`;
+  cell.title = target
+    ? `待应用：${CELL_TITLE[current]} → ${CELL_TITLE[target]}（再点一次撤销）`
+    : CELL_TITLE[current];
+  td.appendChild(cell);
+
+  if (current === 'global') {
+    // 全局共享的扩展不归配置管，点了也没用
+    return td;
   }
-  return tr;
+
+  td.classList.add('pm-cell-clickable');
+  td.addEventListener('click', () => {
+    vscode.postMessage({
+      type: 'toggleCell',
+      extensionId: row.id,
+      profileLocation: profile.location,
+    });
+  });
+
+  if (current !== 'absent') {
+    td.addEventListener('contextmenu', (event) => {
+      event.preventDefault();
+      showMenu(event.clientX, event.clientY, [
+        {
+          label: target === 'absent' ? '取消移出' : `从「${profile.name}」移出`,
+          run: () =>
+            vscode.postMessage({
+              type: 'removeFromProfile',
+              extensionId: row.id,
+              profileLocation: profile.location,
+            }),
+        },
+      ]);
+    });
+  }
+
+  return td;
 }
 
 function renderTable() {
   const payload = state.payload;
   tableHost.textContent = '';
   if (!payload) {
-    return;
-  }
-
-  if (payload.profiles.length === 0) {
-    const empty = document.createElement('div');
-    empty.className = 'pm-empty';
-    empty.textContent = '没有找到 VS Code 配置文件，请确认数据目录可读。';
-    tableHost.appendChild(empty);
     return;
   }
 
@@ -251,7 +380,12 @@ function renderTable() {
     tbody.appendChild(renderGroupHeader(group, rows.length, payload.profiles.length + 1));
     if (!state.collapsed[group]) {
       for (const row of rows) {
-        tbody.appendChild(renderRow(row, payload.profiles));
+        const tr = document.createElement('tr');
+        tr.appendChild(renderNameCell(row));
+        for (const profile of payload.profiles) {
+          tr.appendChild(renderCell(row, profile));
+        }
+        tbody.appendChild(tr);
       }
     }
   }
@@ -259,15 +393,37 @@ function renderTable() {
   tableHost.appendChild(table);
 }
 
+function render() {
+  if (!state.payload) {
+    return;
+  }
+  if (!searchInput) {
+    buildShell();
+  }
+  renderWarnings(state.payload);
+  renderTable();
+  renderApplyBar();
+}
+
 window.addEventListener('message', (event) => {
   const msg = event.data;
   if (msg.type === 'matrix') {
     state.payload = msg.payload;
-    if (!searchInput) {
-      buildShell();
+    render();
+  } else if (msg.type === 'applyResult') {
+    if (msg.applied > 0) {
+      const note = document.createElement('div');
+      note.className = 'pm-warn';
+      note.textContent = `已写入 ${msg.applied} 项改动（备份 ${msg.backups} 份）。完全退出 VS Code 后生效。`;
+      warnHost.prepend(note);
+      setTimeout(() => note.remove(), 8000);
     }
-    renderWarnings(msg.payload);
-    renderTable();
+    if (msg.errors.length > 0) {
+      const note = document.createElement('div');
+      note.className = 'pm-warn pm-warn-error';
+      note.textContent = msg.errors.join('；');
+      warnHost.prepend(note);
+    }
   } else if (msg.type === 'error') {
     app.textContent = `出错了：${msg.message}`;
   }

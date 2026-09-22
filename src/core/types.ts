@@ -41,6 +41,8 @@ export interface MatrixRow {
   group: RowGroup;
   /** profileLocation -> 状态 */
   cells: Record<string, CellState>;
+  /** 扩展图标文件的绝对路径；没有图标时为 undefined */
+  iconPath?: string;
 }
 
 /** 扩展清单条目（来自 extensions.json） */
