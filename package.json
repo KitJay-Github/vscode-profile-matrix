@@ -13,14 +13,19 @@
   ],
   "keywords": [
     "profile",
+    "profiles",
     "extension",
+    "extension manager",
     "配置文件",
-    "扩展管理"
+    "扩展管理",
+    "矩阵"
   ],
+  "galleryBanner": {
+    "color": "#1e1e1e",
+    "theme": "dark"
+  },
+  "icon": "icon.png",
   "main": "./out/extension.js",
-  "activationEvents": [
-    "onStartupFinished"
-  ],
   "contributes": {
     "commands": [
       {
