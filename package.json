@@ -5,6 +5,14 @@
   "version": "0.0.1",
   "publisher": "local-dev",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/KitJay-Github/vscode-profile-matrix.git"
+  },
+  "bugs": {
+    "url": "https://github.com/KitJay-Github/vscode-profile-matrix/issues"
+  },
+  "homepage": "https://github.com/KitJay-Github/vscode-profile-matrix#readme",
   "engines": {
     "vscode": "^1.128.0"
   },
