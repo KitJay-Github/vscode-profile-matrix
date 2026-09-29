@@ -9,6 +9,8 @@ docs/**
 .spike/**
 .superpowers/**
 .code-review-graph/**
+# README 里的截图由 vsce 重写成 GitHub 地址，不必打进包
+images/**
 
 # 构建配置
 tsconfig.json
