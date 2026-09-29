@@ -2,7 +2,7 @@
   "name": "vscode-profile-matrix",
   "displayName": "Profile Matrix",
   "description": "矩阵式管理 VS Code 配置文件与扩展的对应关系",
-  "version": "0.0.1",
+  "version": "0.1.0",
   "publisher": "local-dev",
   "license": "MIT",
   "repository": {
